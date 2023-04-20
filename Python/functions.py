@@ -4,6 +4,7 @@ import os
 import json
 import pandas as pd
 import datetime
+import numpy as np
 
 #replicating read_traces function
 def read_traces(path):
@@ -30,37 +31,64 @@ def read_traces(path):
         HRT = []
         agents = []
         microservices = []
+        arrival = []
+        parent_1 = []
+        parent_2 = []
         
         for i in range(no_reports):
             events = current_data['reports'][i]
             
+            #for operation
             if 'Operation' in events:
                 operations.append(events['Operation'])
             else:
                 operations.append('')
             
-            if 'ParentEventID' in events:
-                parentsID.append(events['ParentEventID'])
-            else:
-                parentsID.append('')
-            
+            #for process name
             if events['ProcessName'] == '':
                 microservices.append('Reference')
             else: 
                 microservices.append(events['ProcessName'])
             
+            #for parents
+            if 'ParentEventID' in events:
+                parents = events['ParentEventID']
+                parentsID.append(parents)
+                no_parents = len(parents)
+                
+                if no_parents == 0:
+                    parent_1.append('')
+                    parent_2.append('')
+                elif no_parents == 1:
+                    parent_1.append(parents[0])
+                    parent_2.append('')
+                elif no_parents == 2:
+                    parent_1.append(parents[0])
+                    parent_2.append(parents[1])
+                
+            else:
+                parentsID.append('')
+                parent_1.append('')
+                parent_2.append('')
+            
+            #all of the other values
             agents.append(events['Agent'])
             threads.append(events['ThreadID'])
             eventID.append(events['EventID'])
             HRT.append(events['HRT'])
+            temp = datetime.datetime.fromtimestamp(events['HRT'] / 1000000000)
+            arrival.append(temp)
             
-        features = {'Operations': operations,
-                    'Threads': threads,
-                    'Services': microservices,
-                    'EventID': eventID,
-                    'ParentID':parentsID,
-                    'HRT': HRT,
-                    'Agents':agents}
+        features = {'id': eventID,
+                    'operation': operations,
+                    'thread': threads,
+                    'service': microservices,
+                    'hrt': HRT,
+                    'arrival': arrival,
+                    'agent':agents,
+                    'parent_id':parentsID,
+                    'parent1':parent_1,
+                    'parent2':parent_2}
         
         structure2.append(pd.DataFrame(features))
             
@@ -73,46 +101,30 @@ def read_traces(path):
         row = row + 1
         
     return structure1, structure2
-
-#replicating table_feats function
-def table_feats(feats):
-    arrival = []
-    operation = []
-    thread = []
-    process = []
-    ids = []
-    parent_1 = []
-    parent_2 = []
-    agents = []
     
-    for i in range(len(feats)):
-        temp = datetime.datetime.fromtimestamp(feats.loc[i]['HRT'] / 1000000000)
-        arrival.append(temp)
-        operation.append(feats.loc[i]['Operations'])
-        thread.append(feats.loc[i]['Threads'])
-        agents.append(feats.loc[i]['Agents'])
-        process.append(feats.loc[i]['Services'])
-        ids.append(feats.loc[i]['EventID'])
-        no_parents = len(feats.loc[i]['ParentID'])
-        parents = feats.loc[i]['ParentID']
+def resp_processes(structure2, processes):
+    
+    n = len(processes)
+    m = len(structure2)
+    
+    resp_processes = {}
+    
+    for i in range(n):
+        process = processes[i]
+        arrival = []
+        departure = []
+        response = []
         
-        if no_parents == 0:
-            parent_1.append('')
-            parent_2.append('')
-        elif no_parents == 1:
-            parent_1.append(parents[0])
-            parent_2.append('')
-        elif no_parents == 2:
-            parent_1.append(parents[0])
-            parent_2.append(parents[1])
-    
-    return pd.DataFrame({'id'        : ids,
-                         'arrival'   : arrival,
-                         'process'   : process,
-                         'agents'    : agents,
-                         'thread'    : thread,
-                         'operation' : operation,
-                         'parent1'   : parent_1,
-                         'parent2'   : parent_2})
+        for j in range(m):
+            indices = np.argwhere(np.array(structure2[j].service == process))
+            arrival.append(structure2[j].arrival.loc[indices[0][0]])
+            departure.append(structure2[j].arrival.loc[indices[-1][0]])
+            response.append((departure[j] - arrival[j]).microseconds / 1000)
             
-
+        process_df = pd.DataFrame({'arrival' : arrival,
+                                  'departure' : departure,
+                                  'response' : response})
+        
+        resp_processes[process] = process_df
+        
+    return resp_processes
