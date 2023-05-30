@@ -4,7 +4,7 @@ directorio = '/Users/tinruelas/Downloads/x-traces/compose/individual/'
 str1, str2 = functions.read_traces(directorio)
 report = str2[5]
 
-functions.plot_services(report)
+functions.plot_services(report, out_name = "/Users/tinruelas/Desktop/graph.pdf")
 
         
     
