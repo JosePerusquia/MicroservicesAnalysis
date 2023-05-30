@@ -266,3 +266,23 @@ def plot_trace(table_features):
                     alpha=0.4))
     
     plt.show()
+
+def plot_services(report, out_name):
+    services = report['service'].unique()
+    
+    services_index = {}
+    for i in range(len(services)):
+        services_index[services[i]] = i
+    
+    report_detailed = report[['id','service', 'parent1', 'parent2']].merge(report[['id', 'service']], left_on = 'parent1', right_on = 'id', suffixes = ["", "_parent1"])
+    report_detailed = report_detailed.merge(report[['id', 'service']], how = 'left', left_on = 'parent2', right_on = 'id', suffixes = ["", "_parent2"])
+    for_adjacency = pd.get_dummies(report_detailed[['id', 'service', 'service_parent1']], columns = ['service_parent1'], prefix = "", prefix_sep = "")
+    adjacency = for_adjacency.groupby('service')[services].sum()
+    adjacency.rename(index = services_index, columns = services_index, inplace = True)
+
+    g = ig.Graph(directed=True).Weighted_Adjacency(adjacency, loops = False)
+
+    g.vs['label'] = services
+    
+    # Plot the graph
+    ig.plot(g, out_name, margin = 100, edge_size = 3, edge_curved = True)
