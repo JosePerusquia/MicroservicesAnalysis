@@ -267,7 +267,7 @@ def plot_trace(table_features):
     
     plt.show()
 
-def plot_services(report, out_name):
+def plot_services(report, out_name, save):
     services = report['service'].unique()
     
     services_index = {}
@@ -285,4 +285,7 @@ def plot_services(report, out_name):
     g.vs['label'] = services
     
     # Plot the graph
-    ig.plot(g, out_name, margin = 100, edge_size = 3, edge_curved = True)
+    if save == 1:
+        ig.plot(g, out_name, margin = 100, edge_size = 3, edge_curved = True)
+    else:
+        ig.plot(g, margin = 100, edge_size = 3, edge_curved = True)
