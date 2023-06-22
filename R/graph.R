@@ -76,7 +76,7 @@ radian.rescale <- function(x, start=0, direction=1) {
   c.rotate(scales::rescale(x, c(0, 2 * pi), range(x)))
 }
 
-lab.locs <- radian.rescale(x=1:10, direction=-1, start=0)
+lab.locs <- radian.rescale(x=1:length(services), direction=-1, start=0)
 
 #----CUARTO PASO: GENERAR LA GRÁFICA ! 
 
