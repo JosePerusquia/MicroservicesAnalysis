@@ -204,17 +204,16 @@ def plot_trace(table_features):
     group_threads = np.empty(0)
     color_threads = []
     
-    for i in range(len(unique_processes)):
+    for i in range(no_unique_processes):
         threads = (table_features[table_features['service'] == unique_processes[i]]['thread']).unique()
         group_threads = np.concatenate((group_threads, threads))
         color_threads = color_threads + [i for j in range(len(threads))]
-     
+
     #coordenadas verticales para la gráfica (cada coordenada corresponde a un thread)
     y = np.empty(n)    
       
     for i in range(no_unique_thread):
         index = np.argwhere(np.array(table_features['thread'] == group_threads[i]))
-        
         y[index] = no_unique_thread - i
     
     #creación de la gráfica
@@ -223,7 +222,7 @@ def plot_trace(table_features):
     #límites y etiquetas del eje vertical (es decir, los nombres de los threads)
     ax.set_ylim([0, no_unique_thread + 1])
     ax.set_xlim([-5, 5 + times[-1]])
-    ax.set_yticks(np.arange(1, no_unique_thread + 1, 1), unique_thread)
+    ax.set_yticks(np.arange(1, no_unique_thread + 1, 1), (np.flip(group_threads)).astype(int))
     
     #se grafica el inicio de cada evento del reporte como un punto negro
     ax.scatter(times, y, c = 'black')
