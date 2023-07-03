@@ -11,18 +11,21 @@ report = read.csv("Documents/Servicio social/report.csv")
 services = unique(report$service)
 
 #para obtener cada id con su servicio y el servicio del (o los) parent(s)
-report_detailed1 = merge(x = report[, c("id", "service", "parent1")],
-                         y = report[, c("id", "service")],
+report_detailed1 = merge(x = report[, c("id", "thread", "service", "parent1")],
+                         y = report[, c("id", "thread", "service")],
                          by.x = "parent1",
                          by.y = "id",
                          suffixes = c("", "_parent"))
-report_detailed2 = merge(x = report[, c("id", "service", "parent2")],
-                         y = report[, c("id", "service")],
+report_detailed2 = merge(x = report[, c("id", "thread", "service", "parent2")],
+                         y = report[, c("id", "thread", "service")],
                          by.x = "parent2",
                          by.y = "id",
                          suffixes = c("", "_parent"))
+report_detailed1 = report_detailed1[report_detailed1$thread != report_detailed1$thread_parent, ]
+report_detailed2 = report_detailed2[report_detailed2$thread != report_detailed2$thread_parent, ]
 report_detailed = rbind(report_detailed1[, c("id", "service", "service_parent")],
                         report_detailed2[, c("id", "service", "service_parent")])
+
 
 #----SEGUNDO PASO: GENERAR LA MATRIZ DE ADYACENCIAS 
 
@@ -36,7 +39,7 @@ adjacency = as.matrix(adjacency[, -1])
 
 #tamaño de los vértices
 services_size = for_adjacency %>% group_by(service) %>% summarise(service_size = n())
-vertex_size = as.matrix(services_size$service_size)[, 1]
+vertex_size = as.matrix(services_size$service_size)[, 1] * 2
 
 vertex_label_dist = c() #la separación de las etiquetas de los vértices
 self_edge_rotation = c() #la rotación de las aristas que salen y caen en el mismo nodo
@@ -46,7 +49,7 @@ rotation = 0 #la rotación de las aristas propias es acumulativa, comienza en ce
 
 #este proceso llena estratégicamente los arrays de valores
 for(i in 1:length(services)){
-  vertex_label_dist = c(vertex_label_dist, 6.5 + 6 * vertex_size[i] / max(vertex_size))
+  vertex_label_dist = c(vertex_label_dist, 3 + 7 * vertex_size[i] / max(vertex_size))
   for(j in 1:length(services)){
     if(adjacency[i, j] != 0){
       if(i == j){
@@ -83,7 +86,7 @@ lab.locs <- radian.rescale(x=1:length(services), direction=-1, start=0)
 graph = graph_from_adjacency_matrix(adjacency, mode = "directed", weighted = TRUE)
 
 plot(graph,
-     vertex.size = vertex_size / 3, 
+     vertex.size = vertex_size, 
      layout = layout.circle(graph),
      margin = 0, 
      edge.arrow.size = 0.15,
@@ -93,8 +96,8 @@ plot(graph,
      vertex.color = 'yellow',
      vertex.label.cex = 0.6,
      edge.label.cex = 0.6,
-     vertex.label.dist = vertex_label_dist, 
-     edge.loop.angle = self_edge_rotation, 
+     vertex.label.dist = vertex_label_dist,
+     edge.loop.angle = self_edge_rotation,
      edge.label = edge_label,
      edge.curved = edge_curved_value,
      vertex.label.degree = lab.locs)
