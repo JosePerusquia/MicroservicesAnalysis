@@ -1,0 +1,8 @@
+"ComposePostService"	"MediaService"	"UserService"	"Reference"	"UniqueIdService"
+"0"	"0"	"1"	"0"	"0"
+"0"	"0"	"0"	"1"	"0"
+"1"	"0"	"0"	"1"	"0"
+"1"	"0"	"0"	"1"	"0"
+"0"	"0"	"0"	"0"	"0"
+"0"	"0"	"0"	"0"	"0"
+"0"	"0"	"0"	"0"	"0"
