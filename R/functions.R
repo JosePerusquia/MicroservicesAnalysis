@@ -2,6 +2,8 @@ library(igraph)
 library(fastDummies)
 library(dplyr)
 library(Matrix)
+library(rjson)
+library(lubridate)
 
 report_adjacency_matrix <- function(report) {
   #----PRIMER PASO: TRANSFORMAR ADECUADAMENTE LOS DATOS
@@ -119,4 +121,181 @@ report_directed_graph <- function(adjacency) {
        edge.label = edge_label,
        edge.curved = edge_curved_value,
        vertex.label.degree = lab.locs)
+}
+
+plot_traces <- function(table_features) {
+  n = nrow(table_features) #número de eventos en el reporte
+  times = (table_features[, 'hrt'] - table_features[1, 'hrt']) / 1000000
+  
+  unique_processes = unique(table_features[, 'service']) #services únicos en el reporte
+  unique_threads = unique(table_features[, 'thread'])
+  
+  #información de los threads para separarlos según el servicio al que pertenecen (el color es para graficarlos)
+  group_threads = c()
+  color_threads = c()
+  colors_rgb = c()
+  
+  for (i in 1:length(unique_processes)){
+    threads = unique((table_features %>% filter(service == unique_processes[i]))[, 'thread'])
+    group_threads = c(group_threads, threads)
+    color_threads = c(color_threads, rep(i, length(threads)))
+    colors_rgb = c(colors_rgb, rgb(runif(1), runif(1), runif(1), alpha = 0.35))
+  }
+  
+  #coordenadas verticales para la gráfica (cada coordenada corresponde a un thread)
+  y = c()  
+  
+  for (i in 1:length(unique_threads)){
+    index = which(table_features[, 'thread'] %in% group_threads[i])
+    y[index] = length(unique_threads) - i + 1
+  }
+  
+  par(mar = c(2, 7, 2, 9), xpd=TRUE)
+  plot(1, type = 'n', ylim = c(0, length(unique_threads) + 1), xlim = c(-5, 5 + tail(times, n = 1)), ylab = '', yaxt = 'n')
+  ytick<-seq(1, length(unique_threads), by = 1)
+  axis(side = 2, at = ytick, labels = FALSE)
+  text(par("usr")[1], ytick, labels = rev(group_threads), pos = 2, xpd = TRUE)
+  #se grafican líneas para representar las conexiones con los parents
+  for (i in 2:n){
+    #para el primer parent
+    index = which(table_features[, 'id'] %in% table_features[i, 'parent1']) #índice del parent
+    x_values = c(times[index], times[i])
+    y_values = c(y[index], y[i])
+    points(x_values, y_values, col='black', lwd = 0.1, pch = 20) #se grafica el punto de padre e hijo
+    
+    if (table_features[index, 'service'] == table_features[i, 'service']){
+      #si el padre y el hijo son del mismo servicio, la línea es azul
+      lines(x_values, y_values, col = 'blue', lty = 1, lwd = 1.5)
+    } else{
+      #si el padre y el hijo son de servicios distintos, la línea es roja
+      lines(x_values, y_values, col = 'red', lty = 1, lwd = 1.5)
+    }
+    
+    #para el segundo parent (es el mismo proceso, pero no todos tienen segundo parent)
+    if (table_features[i, 'parent2'] != ""){
+      index2 = which(table_features[, 'id'] %in% table_features[i, 'parent2'])
+      x2_values = c(times[index2], times[i])
+      y2_values = c(y[index2], y[i])
+      points(x2_values, y2_values, col='black', lwd = 0.1, pch = 20)
+      
+      if (table_features[index2, 'service'] == table_features[i, 'service']){
+        lines(x2_values, y2_values, col = 'blue', lty = 1, lwd = 1.5)
+      } else{
+        lines(x2_values, y2_values, col = 'red', lty = 1, lwd = 1.5)
+      }
+    }
+  }
+  
+  for (i in 1:length(unique_threads)){
+    rect(xleft = -5, ybottom = length(unique_threads) - i + 0.5, 
+         xright = tail(times, n = 1) + 5, ytop = length(unique_threads) - i + 1.5,
+         col = colors_rgb[as.integer(color_threads[i])])
+  }
+  
+  legend("topright", 
+         inset=c(-0.4,0), 
+         legend=unique_processes,
+         fill=colors_rgb,
+         title="services",
+         cex = 0.5)
+}
+
+read_traces <- function(path) {
+  files <- list.files(path=path, pattern="*.json", full.names=TRUE, recursive=FALSE)
+  structure1 = data.frame(matrix(nrow = 0, ncol = 5))
+  colnames(structure1) <- c('name', 'id', 'no_reps', 'initial_time', 'last_time')
+  structure2 = list()
+  
+  row = 1
+  
+  for (file in files){
+    #abrir el archivo actual
+    current_data = fromJSON(file = file)[[1]]
+    
+    #número de reportes
+    no_reports = length(current_data[['reports']])
+    
+    #características a obtener
+    ids = c()
+    operations = c()
+    threads = c()
+    services = c()
+    hrt = c()
+    arrival = c()
+    agents = c()
+    parents_id = c()
+    parent_1 = c()
+    parent_2 = c()
+    
+    for (i in 1:no_reports){
+      events = current_data[['reports']][[i]]
+      
+      #para id
+      ids = c(ids, events[['EventID']])
+      
+      #para operation
+      if (is.null(events[['Operation']])) {
+        operations = c(operations, '')
+      } else {
+        operations = c(operations, events[['Operation']])
+      }
+      
+      #para thread
+      threads = c(threads, events[['ThreadID']])
+      
+      #para service
+      if (events[['ProcessName']] == '') {
+        services = c(services, 'Reference')
+      } else {
+        services = c(services, events[['ProcessName']])
+      }
+      
+      #para hrt
+      hrt = c(hrt, events[['HRT']])
+      
+      #para arrival
+      arrival = c(arrival, as.character(as_datetime((events[['HRT']] / 1000000000))))
+      
+      #para agents
+      agents = c(agents, events[['Agent']])
+      
+      #para parents_id
+      if (is.null(events[['ParentEventID']])) {
+        parents_id = c(parents_id, '')
+        parent_1 = c(parent_1, '')
+        parent_2 = c(parent_2, '')
+      } else {
+        parents = events[['ParentEventID']]
+        parents_id = c(parents_id, parents)
+        no_parents = length(parents)
+        
+        if (no_parents == 0){
+          parent_1 = c(parent_1, '')
+          parent_2 = c(parent_2, '')
+        } else if (no_parents == 1) {
+          parent_1 = c(parent_1, parents[1])
+          parent_2 = c(parent_2, '')
+        } else if (no_parents == 2) {
+          parent_1 = c(parent_1, parents[1])
+          parent_2 = c(parent_2, parents[2])
+        }
+      }
+    }
+    
+    current_dataframe = data.frame(id = ids,
+                                   operation = operations,
+                                   thread = threads,
+                                   service = services, 
+                                   hrt = hrt,
+                                   arrival = arrival,
+                                   agent = agents,
+                                   parent1 = parent_1,
+                                   parent2 = parent_2)
+    
+    structure2[[row]] = current_dataframe[order(current_dataframe$hrt), ]
+    structure1[row, ] = c(file, current_data[['id']], no_reports, min(hrt), max(hrt))
+    row = row + 1
+  }
+  
+  return(list(structure1, structure2))
 }
