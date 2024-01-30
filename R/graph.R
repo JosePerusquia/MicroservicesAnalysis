@@ -1,9 +1,10 @@
+library(here)
 library(igraph)
 library(fastDummies)
 library(dplyr)
 library(Matrix)
 
-report = read.csv("Documents/Servicio social/report.csv")
+report = read.csv(here("R/report.csv"))
 
 #----PRIMER PASO: OBTENER LOS DATOS
 
